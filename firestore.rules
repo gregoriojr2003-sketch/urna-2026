@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    // Voting window closes permanently on 25/10/2026 at 17:00 Brasília time (20:00 UTC) -> 1792958400000 ms
+    function isVotingPeriodOpen() {
+      return request.time < timestamp.value(1792958400000);
+    }
+
+    function isValidVote(data) {
+      return data.keys().hasAll(['candidate', 'candidateName', 'voterSessionId', 'timestamp']) &&
+             data.keys().hasOnly(['candidate', 'candidateName', 'voterSessionId', 'timestamp', 'uf', 'regiao', 'municipio']) &&
+             data.candidate is string &&
+             (data.candidate == '13' || data.candidate == '22' || data.candidate == 'branco' || data.candidate == 'nulo') &&
+             data.candidateName is string &&
+             data.candidateName.size() <= 60 &&
+             data.voterSessionId is string &&
+             data.voterSessionId.size() <= 128 &&
+             data.timestamp is string &&
+             data.timestamp.size() <= 40 &&
+             (!('uf' in data) || (data.uf is string && data.uf.size() <= 6)) &&
+             (!('regiao' in data) || (data.regiao is string && data.regiao.size() <= 40)) &&
+             (!('municipio' in data) || (data.municipio is string && data.municipio.size() <= 80));
+    }
+
+    function isValidTally(data) {
+      return data.keys().hasAll(['lula', 'flavio', 'branco', 'nulo', 'total', 'updatedAt']) &&
+             data.keys().hasOnly(['lula', 'flavio', 'branco', 'nulo', 'total', 'updatedAt']) &&
+             data.lula is number && data.lula >= 0 &&
+             data.flavio is number && data.flavio >= 0 &&
+             data.branco is number && data.branco >= 0 &&
+             data.nulo is number && data.nulo >= 0 &&
+             data.total is number && data.total >= 0 &&
+             data.updatedAt is string && data.updatedAt.size() <= 40;
+    }
+
+    function isValidDeviceVote(data) {
+      return data.keys().hasAll(['deviceId', 'candidate', 'votedAt']) &&
+             data.keys().hasOnly(['deviceId', 'candidate', 'votedAt', 'uf', 'regiao', 'municipio']) &&
+             data.deviceId is string && data.deviceId.size() <= 128 &&
+             data.candidate is string &&
+             (data.candidate == '13' || data.candidate == '22' || data.candidate == 'branco' || data.candidate == 'nulo') &&
+             data.votedAt is string && data.votedAt.size() <= 40 &&
+             (!('uf' in data) || (data.uf is string && data.uf.size() <= 6)) &&
+             (!('regiao' in data) || (data.regiao is string && data.regiao.size() <= 40)) &&
+             (!('municipio' in data) || (data.municipio is string && data.municipio.size() <= 80));
+    }
+
+    function isValidPresence(data) {
+      return data.keys().hasAll(['sessionId', 'lastSeen', 'updatedAtMs']) &&
+             data.keys().hasOnly(['sessionId', 'lastSeen', 'updatedAtMs']) &&
+             data.sessionId is string && data.sessionId.size() <= 128 &&
+             data.lastSeen is string && data.lastSeen.size() <= 40 &&
+             data.updatedAtMs is number;
+    }
+
+    // Public live poll tallies for real-time ranking bar chart
+    match /tallies/{tallyId} {
+      allow read, get, list: if true;
+      allow create, update: if isValidId(tallyId) && isValidTally(request.resource.data);
+      allow delete: if false;
+    }
+
+    // Public online voting ballot box - Inviolable Append-Only ballots
+    match /votes/{voteId} {
+      allow read, get, list: if true;
+      allow create: if isVotingPeriodOpen() &&
+                      isValidId(voteId) &&
+                      isValidVote(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Enforce strictly one vote per device - Inviolable lock
+    match /device_votes/{deviceId} {
+      allow read, get, list: if true;
+      allow create: if isVotingPeriodOpen() &&
+                      isValidId(deviceId) &&
+                      isValidDeviceVote(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Real-time online voters presence
+    match /presence/{sessionId} {
+      allow read, get, list: if true;
+      allow create, update: if isValidId(sessionId) && isValidPresence(request.resource.data);
+      allow delete: if isValidId(sessionId);
+    }
+  }
+}

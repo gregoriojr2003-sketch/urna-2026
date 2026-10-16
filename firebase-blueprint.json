@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "Vote": {
+      "title": "Vote",
+      "description": "An individual anonymous ballot cast by an online voter",
+      "type": "object",
+      "properties": {
+        "candidate": {
+          "type": "string",
+          "enum": ["13", "22", "branco", "nulo"],
+          "description": "Selected candidate code or ballot type"
+        },
+        "candidateName": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Candidate display name"
+        },
+        "voterSessionId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Anonymous client session identifier"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Vote timestamp in ISO string"
+        }
+      },
+      "required": ["candidate", "candidateName", "voterSessionId", "timestamp"]
+    },
+    "Tally": {
+      "title": "Tally",
+      "description": "Aggregated live vote counts for presidential candidates",
+      "type": "object",
+      "properties": {
+        "lula": {
+          "type": "number",
+          "description": "Total votes cast for Lula (13)"
+        },
+        "flavio": {
+          "type": "number",
+          "description": "Total votes cast for Flavio Bolsonaro (22)"
+        },
+        "branco": {
+          "type": "number",
+          "description": "Total blank votes"
+        },
+        "nulo": {
+          "type": "number",
+          "description": "Total null/invalid votes"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total votes tallied"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["lula", "flavio", "branco", "nulo", "total", "updatedAt"]
+    },
+    "DeviceVote": {
+      "title": "DeviceVote",
+      "description": "Record tracking single vote restriction per unique client device",
+      "type": "object",
+      "properties": {
+        "deviceId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique persistent device identifier"
+        },
+        "candidate": {
+          "type": "string",
+          "enum": ["13", "22", "branco", "nulo"],
+          "description": "Candidate voted for"
+        },
+        "votedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Vote timestamp in ISO string"
+        }
+      },
+      "required": ["deviceId", "candidate", "votedAt"]
+    },
+    "Presence": {
+      "title": "Presence",
+      "description": "Active voter presence heartbeat for real-time online user count",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Session identifier"
+        },
+        "lastSeen": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Heartbeat timestamp"
+        },
+        "updatedAtMs": {
+          "type": "number",
+          "description": "Epoch timestamp in milliseconds"
+        }
+      },
+      "required": ["sessionId", "lastSeen", "updatedAtMs"]
+    }
+  },
+  "firestore": {
+    "/votes/{voteId}": {
+      "schema": "Vote",
+      "description": "Individual voting records"
+    },
+    "/tallies/{tallyId}": {
+      "schema": "Tally",
+      "description": "Aggregated real-time poll rankings and totals"
+    },
+    "/device_votes/{deviceId}": {
+      "schema": "DeviceVote",
+      "description": "Single vote enforcement per device"
+    },
+    "/presence/{sessionId}": {
+      "schema": "Presence",
+      "description": "Active voter online sessions"
+    }
+  }
+}
